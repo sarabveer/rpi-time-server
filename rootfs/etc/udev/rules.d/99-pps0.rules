@@ -1,0 +1,1 @@
+SUBSYSTEM=="pps", ATTR{name}=="gps_pps.-1", TAG+="systemd"
