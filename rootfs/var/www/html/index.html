@@ -1,0 +1,93 @@
+﻿<!DOCTYPE html>
+<!--
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Time Server</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/js/bootstrap.min.js"></script>
+  </head>
+
+  <body>
+    <nav class="navbar navbar-expand-lg bg-light">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="/">Time Server</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link" href="gpsd.php">GPSd</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="chrony.php">Chrony</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <h1 class="text-center mt-5 mb-5 font-monospace" id="time"></h1>
+      <h3 class="text-center">Local</h3>
+      <h5 id="server" class="text-center font-monospace mb-4"></h5>
+      <h3 class="text-center">UTC</h3>
+      <h5 id="utc" class="text-center font-monospace"></h5>
+      <p class="text-center mt-5">
+        Diff: <span id="difference"></span><br>
+        <small>(Client <-> Server)</small>
+      </p>
+    </div>
+
+    <script type="module">
+      import { getServerDate } from "./serverDate.js";
+
+      let lastSample = {};
+
+      const synchronize = async () => {
+        setTimeout(synchronize, 10 * 60 * 1000);
+        lastSample = await getServerDate();
+      };
+
+      let options = { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'numeric', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+
+      // Display two real time clocks, the server's and the client's, and show
+      // the difference between them in milliseconds.
+      const updateClocks = () => {
+        setTimeout(updateClocks, 100);
+        const { offset, uncertainty } = lastSample;
+        const serverDate = ( offset > 149 || offset < -149 ) ? new Date(new Date().getTime() + offset) : new Date();
+
+        document.getElementById("time").innerHTML = serverDate.toLocaleTimeString('en-US');
+        document.getElementById("server").innerHTML = serverDate.toLocaleString('en-US', options );
+        document.getElementById("utc").innerHTML = serverDate.toLocaleString('en-US', { timeZone: 'UTC', ...options } );
+
+
+        document.getElementById(
+          "difference"
+        ).innerHTML = `${offset} &plusmn; ${uncertainty} ms`;
+      };
+
+      synchronize();
+      
+      // Display the clocks and update them every second.
+      updateClocks();
+    </script>
+  </body>
+</html>
