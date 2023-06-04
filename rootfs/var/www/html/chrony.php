@@ -6,6 +6,10 @@
 <meta http-equiv='Refresh' content='5'/>
 </head>
   <body>
+    <?php
+    $date = shell_exec('date');
+    echo "<p>$date</p>";
+    ?>
     <b>chronyc sources</b>
     <?php
     $sources = shell_exec('chronyc sources -v');
