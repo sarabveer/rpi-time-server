@@ -109,4 +109,5 @@ This is the html website included in this repo. In concept, it is similar to [ti
 My setup is based off the following guides, very thankful for them.
 
 - https://austinsnerdythings.com/2021/04/19/microsecond-accurate-ntp-with-a-raspberry-pi-and-pps-gps/
+- https://robrobinette.com/pi_GPS_PPS_Time_Server.htm
 - http://www.satsignal.eu/ntp/Raspberry-Pi-NTP.html
