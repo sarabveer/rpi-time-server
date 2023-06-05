@@ -10,6 +10,7 @@ These are the parts I have used.
 - [SparkFun ublox NEO-M9N](https://www.amazon.com/gp/product/B082YDZLL9)
   - I went a little overkill on this one, but this module supports GPS, GLONASS, BeiDou, and Galileo
   - This [Adafruit](https://www.adafruit.com/product/5440) module is a good alternative
+- [Adafruit DS3231 RTC](https://www.adafruit.com/product/3013)
 - Some cheap [Active GPS Antenna](https://www.amazon.com/gp/product/B07R7RC96G)
 - uFL to SMA Adapter Pigtail ([Example](https://www.adafruit.com/product/851))
 - Pin Headers for the GNSS module (Soldering required)
@@ -33,7 +34,7 @@ These are the parts I have used.
 
 ```bash
 sudo apt update
-sudo apt install build-essential pps-tools gpsd gpsd-clients chrony
+sudo apt install git build-essential pps-tools gpsd chrony nginx php-fpm php-gd
 ```
 
 3. Compile PPS device tree
@@ -44,32 +45,28 @@ sudo apt install build-essential pps-tools gpsd gpsd-clients chrony
     git clone https://github.com/beagleboard/bb.org-overlays
     ```
   
-  - Copy `DD-PPS-00A0.dts` into cloned `bb.org-overlays` repo.
+  - Copy `DD-PPS-00A0.dts` into cloned `bb.org-overlays/src/arm/`.
   - Compile .dtbo and place in `/lib/firmware`:
   
     ```bash
-    cpp -nostdinc -I include -undef -x assembler-with-cpp DD-PPS-00A0.dts DD-PPS-00A0.dts.pre
-    sudo dtc -O dtb -o /lib/firmware/DD-PPS-00A0.dtbo -b 0 -@ DD-PPS-00A0.dts.pre
+    make src/arm/DD-PPS.dtbo
+    sudo cp src/arm/DD-PPS.dtbo /lib/firmware
     ```
 
 4. Edit `/boot/uEnv.txt`:
 
 ```bash
-###U-Boot Overlays###
-###Documentation: http://elinux.org/Beagleboard:BeagleBoneBlack_Debian#U-Boot_Overlays
-###Master Enable
-enable_uboot_overlays=1
-###
 ###Overide capes with eeprom
-uboot_overlay_addr0=/lib/firmware/BB-UART4-00A0.dtbo
-uboot_overlay_addr1=/lib/firmware/DD-PPS-00A0.dtbo
+uboot_overlay_addr0=/lib/firmware/BB-I2C2-RTC-DS3231.dtbo
+uboot_overlay_addr1=/lib/firmware/BB-UART4-00A0.dtbo
+uboot_overlay_addr2=/lib/firmware/DD-PPS.dtbo
 ```
 
 5. Reboot to apply changes.
 
 6. Setup GPSd
   
-  - Edit `/etc/gpsd`. Use file in this repo as reference.
+  - Edit `/etc/default/gpsd`. Use file in this repo as reference.
 
   - Start GPSd:
 
@@ -89,13 +86,12 @@ uboot_overlay_addr1=/lib/firmware/DD-PPS-00A0.dtbo
 
     ```bash
     sudo systemctl start chrony
-    sudo systemctl enable chrony
     systemctl status chrony
     ```
 
   - Check using `chronyc tracking`, `chronyc sources -v`, and `chronyc sourcestats -v` commands.
 
-7. (Optional) Setup webserver + php to serve `/var/www/html`.
+7. (Optional) Setup nginx + php to serve `/var/www/html`.
 
 ## Photos
 

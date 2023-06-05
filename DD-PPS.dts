@@ -2,17 +2,10 @@
 /plugin/;
 
 #include <dt-bindings/board/am335x-bbw-bbb-base.h>
-#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/am33xx.h>
+#include <dt-bindings/gpio/gpio.h>
 
 / {
-  compatible = "ti,beaglebone", "ti,beaglebone-black", "ti,beaglebone-green";
-
-  /* identification */
-  part-number = "CLOCK";
-  version = "00A0";
-
-  // gps and pps
   exclusive-use = "P9.12";
 
   fragment@0 {
