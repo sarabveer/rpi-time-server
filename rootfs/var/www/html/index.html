@@ -42,18 +42,26 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
       <h5 id="utc" class="text-center font-monospace"></h5>
       <p class="text-center mt-5">
         Diff: <span id="difference"></span><br>
-        <small>(Client <-> Server)</small>
+        <small>(Client <&mdash;> Server)</small>
       </p>
     </div>
 
     <script type="module">
-      import { getServerDate } from "./serverDate.js";
+      import { getServerDate } from "./serverDate.js.php";
 
       let lastSample = {};
 
       const synchronize = async () => {
-        setTimeout(synchronize, 10 * 60 * 1000);
+        setTimeout(synchronize, 60 * 1000);
         lastSample = await getServerDate();
+        let offsetOutput = '';
+        if ( Math.abs(lastSample.offset) > 99 ) {
+          offsetOutput = `<b>${lastSample.offset / 1000} sec</b>`;
+        } else {
+          offsetOutput = `${lastSample.offset} ms`;
+        }
+        document.getElementById("difference")
+          .innerHTML = `${offsetOutput} <small>&plusmn; ${lastSample.uncertainty} ms</small>`;
       };
 
       let options = { 
@@ -71,17 +79,12 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
       // the difference between them in milliseconds.
       const updateClocks = () => {
         setTimeout(updateClocks, 100);
-        const { offset, uncertainty } = lastSample;
-        const serverDate = ( offset > 149 || offset < -149 ) ? new Date(new Date().getTime() + offset) : new Date();
+        const { offset } = lastSample;
+        const serverDate = ( offset > 99 || offset < -99 ) ? new Date(new Date().getTime() + offset) : new Date();
 
         document.getElementById("time").innerHTML = serverDate.toLocaleTimeString('en-US');
         document.getElementById("server").innerHTML = serverDate.toLocaleString('en-US', options );
         document.getElementById("utc").innerHTML = serverDate.toLocaleString('en-US', { timeZone: 'UTC', ...options } );
-
-
-        document.getElementById(
-          "difference"
-        ).innerHTML = `${offset} &plusmn; ${uncertainty} ms`;
       };
 
       synchronize();
