@@ -1,14 +1,13 @@
-# BeagleBone Black Time Server
+# Raspberry Pi Time Server
 
-Stratum 1 GNSS NTP Server running on a BeagleBone Black
+Stratum 1 GNSS NTP Server running on a Raspberry Pi 2
 
-## Equipment 
+## Equipment
 
 These are the parts I have used.
 
-- [BeagleBone Black](https://beagleboard.org/black)
+- [Raspberry Pi 2](https://www.raspberrypi.com/products/raspberry-pi-2-model-b/)
 - [SparkFun ublox NEO-M9N](https://www.amazon.com/gp/product/B082YDZLL9)
-  - I went a little overkill on this one, but this module supports GPS, GLONASS, BeiDou, and Galileo
   - This [Adafruit](https://www.adafruit.com/product/5440) module is a good alternative
 - [Adafruit DS3231 RTC](https://www.adafruit.com/product/3013)
 - Some cheap [Active GPS Antenna](https://www.amazon.com/gp/product/B07R7RC96G)
@@ -16,87 +15,68 @@ These are the parts I have used.
 - Pin Headers for the GNSS module (Soldering required)
 - Some Male-to-Female DuPont Cables
 
-## Wiring
-
-| BBB              | GNSS Module |
-|------------------|-------------|
-| 5V               | 5V          |
-| GND              | GND         |
-| P9_11 (UART4_TX) | RX          |
-| P9_13 (UART4_RX) | TX          |
-| P9_12 (GPIO 60)  | PPS         |
+Previously the [BeagleBone Black](https://beagleboard.org/black) SBC was used, check the `beaglebone` branch for more information.
 
 ## Setup
 
-1. [Install Debian Minimal on the BeagleBone Black](https://forum.beagleboard.org/t/debian-11-x-bullseye-monthly-snapshots/31280)
-
-2. Install packages:
+1. Install packages:
 
 ```bash
 sudo apt update
-sudo apt install git build-essential pps-tools gpsd chrony nginx php-fpm php-gd
+sudo apt install pps-tools gpsd chrony nginx php-fpm php-gd
 ```
 
-3. Compile PPS device tree
+2. Edit `/boot/firmware/config.txt`
 
-  - Clone `bb.org-overlays` repo:
-   
-    ```bash
-    git clone https://github.com/beagleboard/bb.org-overlays
-    ```
-  
-  - Copy `DD-PPS-00A0.dts` into cloned `bb.org-overlays/src/arm/`.
-  - Compile .dtbo and place in `/lib/firmware`:
-  
-    ```bash
-    make src/arm/DD-PPS.dtbo
-    sudo cp src/arm/DD-PPS.dtbo /lib/firmware
-    ```
+- Uncomment `dtparam=i2c_arm=on`
 
-4. Edit `/boot/uEnv.txt`:
+- Add the following under `[all]`:
 
-```bash
-###Overide capes with eeprom
-uboot_overlay_addr0=/lib/firmware/BB-I2C2-RTC-DS3231.dtbo
-uboot_overlay_addr1=/lib/firmware/BB-UART4-00A0.dtbo
-uboot_overlay_addr2=/lib/firmware/DD-PPS.dtbo
-```
+  ```bash
+  # Overclock
+  arm_freq=1000
+  core_freq=500
+  sdram_freq=500
+  over_voltage=2
+  # Serial, RTC, PPS
+  enable_uart=1
+  dtoverlay=i2c-rtc,ds3231
+  dtoverlay=pps-gpio,gpiopin=18
+  nohz=off
+  ```
 
-5. Reboot to apply changes.
+3. Reboot to apply changes.
 
-6. Setup GPSd
-  
-  - Edit `/etc/default/gpsd`. Use file in this repo as reference.
+4. Setup GPSd
 
-  - Start GPSd:
+- Edit `/etc/default/gpsd`. Use file in this repo as reference.
 
-    ```bash
-    sudo systemctl start gpsd
-    sudo systemctl enable gpsd
-    systemctl status gpsd
-    ```
+- Start GPSd:
 
-  - Check using `gpsmon` and `cgps` commands.
+  ```bash
+  sudo systemctl stop serial-getty@ttyAMA0
+  sudo systemctl disable serial-getty@ttyAMA0
+  sudo systemctl start gpsd
+  sudo systemctl enable gpsd
+  systemctl status gpsd
+  ```
 
-6. Setup Chrony
-  
-  - Edit Chrony config files. Use file in this repo as reference.
+- Check using `gpsmon` and `cgps` commands.
 
-  - Start GPSd:
+5. Setup Chrony
 
-    ```bash
-    sudo systemctl start chrony
-    systemctl status chrony
-    ```
+- Edit Chrony config files. Use file in this repo as reference.
 
-  - Check using `chronyc tracking`, `chronyc sources -v`, and `chronyc sourcestats -v` commands.
+- Start Chrony:
 
-7. (Optional) Setup nginx + php to serve `/var/www/html`.
+  ```bash
+  sudo systemctl start chrony
+  systemctl status chrony
+  ```
 
-## Photos
+- Check using `chronyc tracking`, `chronyc sources -v`, and `chronyc sourcestats -v` commands.
 
-![Alt text](/img/outside.jpeg?raw=true "Built Unit")
-![Alt text](/img/inside.jpeg?raw=true "Inside Unit")
+6. (Optional) Setup nginx + php to serve webpage: `/etc/nginx/` & `/var/www/html`.
 
 ### Time Page
 
@@ -106,7 +86,7 @@ This is the html website included in this repo. In concept, it is similar to [ti
 
 ## References
 
-My setup is based off the following guides, very thankful for them.
+My setup is based off the following guides.
 
 - https://austinsnerdythings.com/2021/04/19/microsecond-accurate-ntp-with-a-raspberry-pi-and-pps-gps/
 - https://robrobinette.com/pi_GPS_PPS_Time_Server.htm

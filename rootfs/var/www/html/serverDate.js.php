@@ -7,8 +7,7 @@
  * https://github.com/NodeGuy/server-date/blob/e784fc8ce6644ce0cbac79ebc5d427a3a3b1940f/PHP/serverDate.js.php
 */
 
-
- const fetchSampleImplementation = async () => {
+const fetchSampleImplementation = async () => {
   const requestDate = new Date();
 
   const { serverDate } = await import(

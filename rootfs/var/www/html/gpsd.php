@@ -90,15 +90,25 @@ if (isset($_GET['imgdata']) && $op == 'view'){
                     $port = $_GET['port'];
 
     if ($testmode){
+        $have_sky = false;
+        $have_tpv = false;
+        $skyresp = "";
+        $tpvresp = "";
         $sock = @fsockopen($server, $port, $errno, $errstr, 2);
-        @fwrite($sock, "?WATCH={\"enable\":true}\n");
+        @fwrite($sock, "?WATCH={\"enable\":true,\"json\":true}\n");
+        // Start the loop to start reading from gpsd.
         usleep(1000);
-        @fwrite($sock, "?POLL;\n");
-        usleep(1000);
-        for($tries = 0; $tries < 10; $tries++){
-                $resp = @fgets($sock, 10000); # SKY can be pretty big
-                if (preg_match('/{"class":"POLL".+}/i', $resp, $m)){
-                        $resp = $m[0];
+        for($tries = 0; $tries < 100; $tries++){
+                $resp = @fread($sock, 10000); # SKY can be pretty big
+                if (preg_match('/{"class":"SKY".+}/i', $resp, $m)){
+                        $skyresp = $m[0];
+                        $have_sky = true;
+                }
+                elseif (preg_match('/{"class":"TPV".+}/i', $resp, $m)){
+                        $tpvresp = $m[0];
+                        $have_tpv = true;
+                }
+                if ($have_sky && $have_tpv) {
                         break;
                 }
         }
@@ -107,6 +117,8 @@ if (isset($_GET['imgdata']) && $op == 'view'){
             $resp = '{"class":"ERROR","message":"no response from GPS daemon"}';
     }
 }
+# fake a partial ?POLL response
+$resp = '{"class":"POLL","tpv":[' . $tpvresp . '],"sky":[' . $skyresp . ']}';
 
 # ensure all satellites keys exist, for clean logs.
 function sat_clean($sat) {
@@ -528,7 +540,7 @@ function write_html($resp) {
         $server = $x; $port = $y;
 
         if ($autorefresh > 0)
-            $autorefresh = "<meta http-equiv='Refresh' content='$autorefresh'/>";
+            $autorefresh = "<meta http-equiv='Refresh' content='$autorefresh'>";
         else
             $autorefresh = '';
 
@@ -546,14 +558,30 @@ function write_html($resp) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 {$head}
 {$map_head}
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 <title>{$title} - GPSD Test Station {$lat}, {$lon}</title>
 {$autorefresh}
-<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <style>
-blink,
+.blink {
+    color: #dc322f;
+    animation: blinking 1.5s linear infinite;
+}
+
+@keyframes blinking{
+    0%{
+      opacity: 0;
+    }
+    50%{
+      opacity: 0.7;
+    }
+    100%{
+      opacity: 0;
+    }
+}
+
 .warning {
     color: #dc322f;
 }
@@ -596,7 +624,7 @@ td:nth-child(1) {
 </div>
 EOF;
 
-        if (!strlen($advertise))
+        if (0 == strlen($advertise))
                 $advertise = $server;
 
         if ($testmode && !$sock)
@@ -607,7 +635,7 @@ EOF;
 
 <div style="width:600px;float:right;margin:0 0 1ex 1em;">
 <img src="?op=view&amp;imgdata={$imgdata}"
-width="600" height="600" alt="Skyview"/>
+width="600" height="600" alt="Skyview">
 <br style="clear:both">
 <p class="caption">A filled shape means the satellite was used in
 the last fix.<br>
@@ -631,13 +659,13 @@ EOF;
 
 <div>To get real-time information, connect to
 <span class="fixed">telnet://{$advertise}:{$port}/</span> and type "?POLL;"
-or "?WATCH={"enable":true,"raw":true}".<br/>
-Use a different server:<br/>
-<form method=GET action="${_SERVER['SCRIPT_NAME']}">
+or "?WATCH={"enable":true,"raw":true}".<br>
+Use a different server:<br>
+<form method=GET action="{$_SERVER['SCRIPT_NAME']}">
 <input name="host" value="{$advertise}">:
 <input name="port" value="{$port}" size="5" maxlength="5">
 <input type=submit value="Get Position"><input type=reset></form>
-<br/>
+<br>
 </div>
 EOF;
         else
@@ -651,7 +679,10 @@ EOF;
         else {
             $fix = $GPS['tpv'][0];
             $sky = $GPS['sky'][0];
-            $sats = $sky['satellites'];
+            $sats = Array();
+            if (array_key_exists('satellites', $sky)) {
+                $sats = $sky['satellites'];
+            }
 
             $fixtype = array('Unknown' => 0, 'No Fix' => 1, '2D Fix' => 2,
                              '3D Fix' => 3);
@@ -785,35 +816,35 @@ EOF;
 <!-- -->
 <div style="float:left;margin:0 0 1ex 1em;">
     <table style="border-width:1px;border-style:solid;text-align:center;">
-        <tr><th colspan=3 style="text-align:center">Fix Data</th></tr>
-        <tr><td>Fix Type</td><td>{$type}</td></tr>
-        <tr><td>Fix Status</td><td>{$status}</td></tr>
-        <tr><th colspan=3 style="text-align:center">Time</th></tr>
-        <tr><td>UTC</td><td colspan=2>{$ts}&nbsp;</td></tr>
-        <tr><td>Leap Seconds</td><td>{$fix['leapseconds']}</td></tr>
-        <tr><th colspan=3 style="text-align:center">Position</th></tr>
+        <tr><th colspan="3" style="text-align:center">Fix Data</th></tr>
+        <tr><td>Fix Type</td><td>{$type}</td><td>&nbsp;</td></tr>
+        <tr><td>Fix Status</td><td>{$status}</td><td>&nbsp;</td></tr>
+        <tr><th colspan="3" style="text-align:center">Time</th></tr>
+        <tr><td>UTC</td><td colspan="2">{$ts}&nbsp;</td></tr>
+        <tr><td>Leap Seconds</td><td>{$fix['leapseconds']}</td><td>&nbsp;</td></tr>
+        <tr><th colspan="3" style="text-align:center">Position</th></tr>
         <tr><td>Latitude</td><td>{$lat}</td></tr>
         <tr><td>Longitude</td><td>{$lon}</td></tr>
         <tr title="Height Above Ellipsoid. Typically WGS84">
           <td>Altitude HAE</td><td>{$altHAE}</td></tr>
         <tr title="Height Above Mean Sea Level">
-          <td>Altitude MSL</td><td>{$altMSL}</td></tr>
-        <tr title="HAE - MSL"><td>Geoid Separation</td><td>{$geoidSep}</td></tr>
-        <tr><th colspan=3 style="text-align:center">Velocity</th></tr>
+          <td>Altitude MSL</td><td>{$altMSL}</td><td>&nbsp;</td></tr>
+        <tr title="HAE - MSL"><td>Geoid Separation</td><td>{$geoidSep}</td><td>&nbsp;</td></tr>
+        <tr><th colspan="3" style="text-align:center">Velocity</th></tr>
         <tr title="Horizontal Velocity"><td>Speed</td><td>{$speed}</td></tr>
         <tr title="Vertical Velocity"><td>Climb</td><td>{$climb}</td></tr>
-        <tr title="Velocity North"><td>velN</td><td>{$velN}</td></tr>
-        <tr title="Velocity East"><td>velE</td><td>{$velE}</td></tr>
-        <tr title="Velocity Down"><td>velD</td><td>{$velD}</td></tr>
+        <tr title="Velocity North"><td>velN</td><td>{$velN}</td><td>&nbsp;</td></tr>
+        <tr title="Velocity East"><td>velE</td><td>{$velE}</td><td>&nbsp;</td></tr>
+        <tr title="Velocity Down"><td>velD</td><td>{$velD}</td><td>&nbsp;</td></tr>
         <tr><td>Track True</td><td>{$track}</td></tr>
-        <tr><td>Track Magnetic</td><td>{$magtrack}</td></tr>
-        <tr><td>Magnetic Variation</td><td>{$magvar}</td></tr>
+        <tr><td>Track Magnetic</td><td>{$magtrack}</td><td>&nbsp;</td></tr>
+        <tr><td>Magnetic Variation</td><td>{$magvar}</td><td>&nbsp;</td></tr>
     </table>
 </div>
 <div style="float:left;margin:0 0 1ex 1em;">
     <table style="border-width:1px;border-style:solid;text-align:center;">
         <tr title="Dimentionless Ratios">
-            <th colspan=2 style="text-align:center">Dilution of Precision
+            <th colspan="2" style="text-align:center">Dilution of Precision
             </th></tr>
         <tr title="Geometric Dilution Of Precision"><td>GDOP
             </td><td>{$sky['gdop']}</td></tr>
@@ -834,7 +865,7 @@ EOF;
 <div style="float:left;margin:0 0 1ex 1em;">
     <table style="border-width:1px;border-style:solid;text-align:center;">
         <tr title="Unknown/undefined uncertainty">
-            <th colspan=2 style="text-align:center">Error Estimates</th></tr>
+            <th colspan="2" style="text-align:center">Error Estimates</th></tr>
         <tr title="Estimated Precision of Climb"><td>epc</td>
             <td>{$epc}</td></tr>
         <tr title="Estimated Precision 2D"><td>eph</td>
@@ -859,8 +890,8 @@ EOF;
 
 <div style="float:right;margin:0 0 1ex 1em;">
     <table style="border-width:1px;border-style:solid">
-        <tr><th colspan=6 style="text-align:center">Satellites</th></tr>
-        <tr><td colspan=6 style="text-align:center"
+        <tr><th colspan="6" style="text-align:center">Satellites</th></tr>
+        <tr><td colspan="6" style="text-align:center"
             >Seen {$nsv}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Used {$sats_used}
 </td></tr>
         <tr><th></th><th>PRN</th>
@@ -872,9 +903,9 @@ $sat    </table>
 
 <div style="float:left;margin:0 0 1ex 1em;">
     <table style="border-width:1px;border-style:solid;text-align:center;">
-        <tr><th colspan=5 style="text-align:center"
+        <tr><th colspan="5" style="text-align:center"
 >Earth Centered Earth Fixed (ECEF)</th></tr>
-        <tr><th></th><th>X</th><th>Y</th><th>Z</th><th>Acc</th></td>
+        <tr><th></th><th>X</th><th>Y</th><th>Z</th><th>Acc</th></tr>
         <tr><td>Position</td>
             <td>{$ecefx}</td><td>{$ecefy}</td> <td>{$ecefz}</td></tr>
         <tr><td>Velocity</td>
@@ -946,13 +977,13 @@ function write_config(){
 \$blurb = <<<EOT
 This is a
 <a href="@WEBSITE@">gpsd</a>
-server <blink>located someplace</blink>.
+server <span class="blink">located someplace</span>.
 
 The hardware is a
-<blink>hardware description and link</blink>.
+<span class="blink">hardware description and link</span>.
 
 This machine is maintained by
-<a href="mailto:you@example.com">Your Name Goes Here</a>.<br/>
+<a href="mailto:you@example.com">Your Name Goes Here</a>.<br>
 EOT;
 
 ?>
@@ -1000,8 +1031,11 @@ function gen_osm_head() {
     global $GPS;
     return <<< EOT
 
-<script src="https://cdn.jsdelivr.net/npm/ol@v7/dist/ol.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7/ol.css">    
+<link rel="stylesheet"
+ href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.2.1/css/ol.css"
+ type="text/css">
+<script
+ src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.2.1/build/ol.js"></script>
 
 EOT;
 }
@@ -1013,7 +1047,7 @@ function gen_osmmap_code() {
     <div id="map" style="height:400px;"></div>
     <noscript>
         <span class='warning'>Sorry: you must enable javascript to view our
-maps.</span><br/>
+maps.</span><br>
     </noscript>
 
 <script>
@@ -1068,7 +1102,7 @@ function gen_map_code() {
     Loading...
     <noscript>
         <span class='warning'>Sorry: you must enable javascript to view our
-maps.</span><br/>
+maps.</span><br>
     </noscript>
 </div>
 

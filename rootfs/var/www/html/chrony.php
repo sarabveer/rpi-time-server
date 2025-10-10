@@ -12,12 +12,12 @@
     ?>
     <b>chronyc sources</b>
     <?php
-    $sources = shell_exec('chronyc sources -v');
+    $sources = shell_exec('chronyc -N sources -v');
     echo "<pre>$sources</pre>";
     ?>
     <b>chronyc sourcestats</b>
     <?php
-    $stats = shell_exec('chronyc sourcestats -v');
+    $stats = shell_exec('chronyc -N sourcestats -v');
     echo "<pre>$stats</pre>";
     ?>
     <b>chronyc tracking</b>
