@@ -45,44 +45,60 @@ sudo apt install pps-tools gpsd chrony nginx php-fpm php-gd
   nohz=off
   ```
 
-3. Reboot to apply changes.
+3. Edit `/boot/firmware/cmdline.txt`, remove `console=serial0,115200`
 
-4. Setup GPSd
+4. Reboot to apply changes.
+
+5. Setup GPSd
 
 - Edit `/etc/default/gpsd`. Use file in this repo as reference.
+
+- Edit systemd service to start after chrony: `sudo systemctl edit gpsd`
+
+  Add:
+  ```
+  [Unit]
+  After=chrony.service
+  ```
 
 - Start GPSd:
 
   ```bash
-  sudo systemctl stop serial-getty@ttyAMA0
-  sudo systemctl disable serial-getty@ttyAMA0
-  sudo systemctl start gpsd
-  sudo systemctl enable gpsd
+  sudo systemctl disable --now serial-getty@ttyAMA0.service
+  sudo systemctl mask serial-getty@ttyAMA0.service
+  sudo systemctl enable --now gpsd
   systemctl status gpsd
   ```
 
 - Check using `gpsmon` and `cgps` commands.
 
-5. Setup Chrony
+6. Setup Chrony
 
 - Edit Chrony config files. Use file in this repo as reference.
 
 - Start Chrony:
 
   ```bash
-  sudo systemctl start chrony
+  sudo systemctl enable chrony
+  sudo systemctl restart chrony gpsd
   systemctl status chrony
   ```
 
 - Check using `chronyc tracking`, `chronyc sources -v`, and `chronyc sourcestats -v` commands.
 
-6. (Optional) Setup nginx + php to serve webpage: `/etc/nginx/` & `/var/www/html`.
+7. (Optional) Setup nginx + php to serve webpage: `/etc/nginx/` & `/var/www/html`.
 
-### Time Page
+### Webpage
 
-This is the html website included in this repo. In concept, it is similar to [time.is](https://time.is).
+The following webpages are included in this repo.
 
-![Alt text](/img/time.png?raw=true "Current Time")
+#### index.html
+
+Shows current time + offset, similar to [time.is](https://time.is) (Requires `serverDate.js.php`).
+
+#### chrony.php
+
+Quick page that shows the output of the following commands: `chronyc sources`, `chronyc sourcestats`, `chronyc tracking`.
 
 ## References
 
@@ -91,3 +107,4 @@ My setup is based off the following guides.
 - https://austinsnerdythings.com/2021/04/19/microsecond-accurate-ntp-with-a-raspberry-pi-and-pps-gps/
 - https://robrobinette.com/pi_GPS_PPS_Time_Server.htm
 - http://www.satsignal.eu/ntp/Raspberry-Pi-NTP.html
+- https://conorrobinson.ie/raspberry-pi-ntp-server-part-6/
