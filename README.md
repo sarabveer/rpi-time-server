@@ -23,7 +23,47 @@ Previously the [BeagleBone Black](https://beagleboard.org/black) SBC was used, c
 
 ```bash
 sudo apt update
-sudo apt install pps-tools gpsd chrony nginx php-fpm php-gd
+sudo apt install pps-tools chrony nginx php-fpm php-gd
+```
+
+On trixie, build GPSd 3.27.x from the forky source package. Trixie currently
+ships GPSd 3.25, while forky/sid have GPSd 3.27.x.
+
+Fetch the Debian 13/trixie archive signing key first. Forky source metadata is
+signed by Debian's archive key, not Raspberry Pi OS's archive key.
+
+```bash
+sudo dpkg -r gpsd-build-deps
+```
+
+```bash
+sudo apt install ca-certificates wget
+sudo install -d -m 0755 /usr/share/keyrings
+sudo wget -O /usr/share/keyrings/debian-archive-trixie-automatic.asc https://ftp-master.debian.org/keys/archive-key-13.asc
+
+sudo tee /etc/apt/sources.list.d/debian-forky.sources >/dev/null <<'EOF'
+Types: deb-src
+URIs: http://deb.debian.org/debian
+Suites: forky
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-trixie-automatic.asc
+EOF
+
+sudo apt update
+sudo apt install build-essential scons pkgconf python3 python-is-python3 python3-serial libncurses-dev libusb-1.0-0-dev libsystemd-dev libudev-dev
+apt source gpsd/forky
+cd gpsd-3.27.*
+
+scons -c
+scons prefix=/usr systemd=yes manbuild=no qt=no dbus_export=no
+sudo scons prefix=/usr systemd=yes manbuild=no qt=no dbus_export=no install
+sudo scons prefix=/usr systemd=yes manbuild=no qt=no dbus_export=no udev-install
+
+if ! getent passwd gpsd >/dev/null; then
+  sudo adduser --system --no-create-home --home /run/gpsd --ingroup dialout gpsd
+fi
+sudo adduser gpsd dialout
+gpsd -V
 ```
 
 2. Edit `/boot/firmware/config.txt`
@@ -33,19 +73,12 @@ sudo apt install pps-tools gpsd chrony nginx php-fpm php-gd
 - Add the following under `[all]`:
 
   ```bash
-  # Overclock
-  arm_freq=1000
-  core_freq=500
-  sdram_freq=500
-  over_voltage=2
-  # Serial, RTC, PPS
   enable_uart=1
   dtoverlay=i2c-rtc,ds3231
   dtoverlay=pps-gpio,gpiopin=18
-  nohz=off
   ```
 
-3. Edit `/boot/firmware/cmdline.txt`, remove `console=serial0,115200`
+3. Edit `/boot/firmware/cmdline.txt`, remove `console=serial0,115200`, add `nohz=off`.
 
 4. Reboot to apply changes.
 
@@ -58,6 +91,7 @@ sudo apt install pps-tools gpsd chrony nginx php-fpm php-gd
   Add:
   ```
   [Unit]
+  Wants=chrony.service
   After=chrony.service
   ```
 
@@ -70,7 +104,7 @@ sudo apt install pps-tools gpsd chrony nginx php-fpm php-gd
   systemctl status gpsd
   ```
 
-- Check using `gpsmon` and `cgps` commands.
+- Check using the `cgps` command.
 
 6. Setup Chrony
 

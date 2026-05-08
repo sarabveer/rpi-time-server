@@ -3,7 +3,8 @@
 DEVICES="/dev/serial0 /dev/pps0"
 
 # Other options you want to pass to gpsd
-GPSD_OPTIONS="-n -s 115200"
+GPSD_OPTIONS="-p -n -s 115200"
+OPTIONS=""
 
 # Automatically hot add/remove USB GPS devices via gpsdctl
 USBAUTO="false"
